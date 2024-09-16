@@ -15,15 +15,18 @@ class AppointmentPayController extends Controller
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', AppointmentPay::class);
+
         $specialitie_id = $request->specialitie_id;
         $search_doctor = $request->search_doctor;
         $search_patient = $request->search_patient;
         $date_start = $request->date_start;
         $date_end = $request->date_end;
+        $user = auth('api')->user();
 
-        $appointments = Appointment::filterAdvancePay($specialitie_id, $search_doctor, $search_patient, $date_start, $date_end)
+        $appointments = Appointment::filterAdvancePay($specialitie_id, $search_doctor, $search_patient, $date_start, $date_end, $user)
             ->orderBy("status_pay", "desc")
-            ->paginate(5);
+            ->paginate(80);
 
         return response()->json([
             "total" => $appointments->total(),
@@ -44,13 +47,16 @@ class AppointmentPayController extends Controller
             ]);
         }
 
+        $apppointment = Appointment::findOrFail($request->appointment_id);
+
+        $this->authorize('addPayment', $apppointment);
+
         $appointment_pay = AppointmentPay::create([
             "appointment_id" => $request->appointment_id,
             "amount" =>  $request->amount,
             "method_payment" =>  $request->method_payment,
         ]);
 
-        $apppointment = Appointment::findOrFail($request->appointment_id);
         $is_total_payment = false;
         if (($apppointment->amount) == ($sum_total_pays + $request->amount)) {
             $apppointment->update(["status_pay" => 1]);
@@ -87,6 +93,8 @@ class AppointmentPayController extends Controller
 
         $old_amount = $appointment_pay->amount;
         $new_amount = $request->amount;
+        $this->authorize('view', $appointment_pay);
+
 
         // 100
         // 50
@@ -132,6 +140,7 @@ class AppointmentPayController extends Controller
     public function destroy(string $id)
     {
         $appointment_pay = AppointmentPay::findOrFail($id);
+        $this->authorize('delete', $appointment_pay);
 
         $apppointment = Appointment::findOrFail($appointment_pay->appointment_id);
         $apppointment->update(["status_pay" => 2]);

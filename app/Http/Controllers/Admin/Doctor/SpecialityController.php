@@ -14,12 +14,14 @@ class SpecialityController extends Controller
     public function index(Request $request)
     {
         // QUE EL FILTRO POR NOMBRE DE ROL
+        $this->authorize('viewAny', Specialitie::class);
+
         $name = $request->search;
 
-        $specialities = Specialitie::where("name","like","%".$name."%")->orderBy("id","desc")->get();
+        $specialities = Specialitie::where("name", "like", "%" . $name . "%")->orderBy("id", "desc")->get();
 
         return response()->json([
-            "specialities" => $specialities->map(function($rol) {
+            "specialities" => $specialities->map(function ($rol) {
                 return [
                     "id" => $rol->id,
                     "name" => $rol->name,
@@ -35,9 +37,11 @@ class SpecialityController extends Controller
      */
     public function store(Request $request)
     {
-        $is_specialitie = Specialitie::where("name",$request->name)->first();
+        $this->authorize('create', Specialitie::class);
 
-        if($is_specialitie){
+        $is_specialitie = Specialitie::where("name", $request->name)->first();
+
+        if ($is_specialitie) {
             return response()->json([
                 "message" => 403,
                 "message_text" => "EL NOMBRE DE LA ESPECIALIDAD YA EXISTE"
@@ -56,6 +60,8 @@ class SpecialityController extends Controller
      */
     public function show(string $id)
     {
+        $this->authorize('view', Specialitie::class);
+
         $specialitie = Specialitie::findOrFail($id);
         return response()->json([
             "id" => $specialitie->id,
@@ -69,9 +75,11 @@ class SpecialityController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        $is_specialitie = Specialitie::where("id","<>",$id)->where("name",$request->name)->first();
+        $this->authorize('update', Specialitie::class);
 
-        if($is_specialitie){
+        $is_specialitie = Specialitie::where("id", "<>", $id)->where("name", $request->name)->first();
+
+        if ($is_specialitie) {
             return response()->json([
                 "message" => 403,
                 "message_text" => "EL NOMBRE DE LA ESPECIALIDAD YA EXISTE"
@@ -90,6 +98,8 @@ class SpecialityController extends Controller
      */
     public function destroy(string $id)
     {
+        $this->authorize('delete', Specialitie::class);
+
         $specialitie = Specialitie::findOrFail($id);
         $specialitie->delete();
         return response()->json([

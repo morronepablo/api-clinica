@@ -24,16 +24,43 @@ class AppointmentController extends Controller
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Appointment::class);
+
         $specialitie_id = $request->specialitie_id;
         $name_doctor = $request->search;
         $date = $request->date;
+        $user = auth('api')->user();
 
-        $appointments = Appointment::filterAdvance($specialitie_id, $name_doctor, $date)->orderBy("id", "desc")
-            ->paginate(8);
+        $appointments = Appointment::filterAdvance($specialitie_id, $name_doctor, $date, $user)->orderBy("id", "desc")
+            ->paginate(80);
 
         return response()->json([
             "total" => $appointments->total(),
             "appointments" => AppointmentCollection::make($appointments),
+        ]);
+    }
+
+    public function calendar(Request $request)
+    {
+
+        $specialitie_id = $request->specialitie_id;
+        $search_doctor = $request->search_doctor;
+        $search_patient = $request->search_patient;
+        $user = auth('api')->user();
+
+        $appointments = Appointment::filterAdvancePay($specialitie_id, $search_doctor, $search_patient, null, null, $user)
+            ->orderBy("id", "desc")
+            ->get();
+
+        return response()->json([
+            "appointments" => $appointments->map(function ($appointment) {
+                return [
+                    "id" => $appointment->id,
+                    "title" => "CITA MEDICA - " . ($appointment->doctor->name . ' ' . $appointment->doctor->surname) . " - " . $appointment->specialitie->name,
+                    "start" => Carbon::parse($appointment->date_appointment)->format("Y-m-d") . "T" . $appointment->doctor_schedule_join_hour->doctor_schedule_hour->hour_start,
+                    "end" => Carbon::parse($appointment->date_appointment)->format("Y-m-d") . "T" . $appointment->doctor_schedule_join_hour->doctor_schedule_hour->hour_end,
+                ];
+            })
         ]);
     }
 
@@ -91,6 +118,8 @@ class AppointmentController extends Controller
 
     public function filter(Request $request)
     {
+        $this->authorize('filter', Appointment::class);
+
         $date_appointment = $request->date_appointment;
         $hour = $request->hour;
         $specialitie_id = $request->specialitie_id;
@@ -194,6 +223,8 @@ class AppointmentController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create', Appointment::class);
+
         // doctor_id
         // name
         // surname
@@ -208,6 +239,7 @@ class AppointmentController extends Controller
         // amount_add
         // method_payment
 
+
         $patient = null;
 
         $patient = Patient::where("n_document", $request->n_document)->first();
@@ -219,53 +251,39 @@ class AppointmentController extends Controller
                 "mobile" => $request->mobile,
                 "n_document" => $request->n_document,
             ]);
-
-            if ($patient) {
-                PatientPerson::create([
-                    "patient_id" => $patient->id,
-                    "name_companion" => $request->name_companion,
-                    "surname_companion" => $request->surname_companion,
-                ]);
-            }
-        } else {
-            if ($patient->person) {
-                $patient->person->update([
-                    "name_companion" => $request->name_companion,
-                    "surname_companion" => $request->surname_companion,
-                ]);
-            }
-        }
-
-        if ($patient) {
-            // Obtener el usuario por su email
-            $user = User::where('email', $request->user_email)->first();
-            if (!$user) {
-                return response()->json(["message" => "User not found"], 404);
-            }
-
-            $appointment = Appointment::create([
-                "doctor_id" => $request->doctor_id,
+            PatientPerson::create([
                 "patient_id" => $patient->id,
-                "date_appointment" => Carbon::parse($request->date_appointment)->format("Y-m-d h:i:s"),
-                "specialitie_id" => $request->specialitie_id,
-                "doctor_schedule_join_hour_id" => $request->doctor_schedule_join_hour_id,
-                "user_id" => $user->id, // Usar el ID del usuario obtenido por el email
-                "amount" => $request->amount,
-                "status_pay" => $request->amount != $request->amount_add ? 2 : 1,
+                "name_companion" => $request->name_companion,
+                "surname_companion" => $request->surname_companion,
             ]);
-
-            if ($appointment) {
-                AppointmentPay::create([
-                    "appointment_id" => $appointment->id,
-                    "amount" => $request->amount_add,
-                    "method_payment" => $request->method_payment,
-                ]);
-            }
         } else {
-            return response()->json(["message" => "Failed to create or find patient"], 500);
+            $patient->person->update([
+                "name_companion" => $request->name_companion,
+                "surname_companion" => $request->surname_companion,
+            ]);
         }
 
-        return response()->json(["message" => 200]);
+        $appointment =  Appointment::create([
+            "doctor_id" => $request->doctor_id,
+            "patient_id" => $patient->id,
+            "date_appointment" => Carbon::parse($request->date_appointment)->format("Y-m-d h:i:s"),
+            "specialitie_id" => $request->specialitie_id,
+            "doctor_schedule_join_hour_id" => $request->doctor_schedule_join_hour_id,
+            "user_id" => auth("api")->user()->id,
+            "amount" => $request->amount,
+            "status_pay" => $request->amount != $request->amount_add ? 2 : 1,
+        ]);
+
+
+        AppointmentPay::create([
+            "appointment_id" => $appointment->id,
+            "amount" => $request->amount_add,
+            "method_payment" => $request->method_payment,
+        ]);
+
+        return response()->json([
+            "message" => 200,
+        ]);
     }
 
     /**
@@ -274,7 +292,8 @@ class AppointmentController extends Controller
     public function show(string $id)
     {
         $appointment = Appointment::findOrFail($id);
-
+        //    dd($appointment);
+        $this->authorize('view', $appointment);
         return response()->json([
             "appointment" => AppointmentResource::make($appointment)
         ]);

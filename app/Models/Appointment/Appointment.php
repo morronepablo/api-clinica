@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class Appointment extends Model
 {
@@ -24,7 +25,9 @@ class Appointment extends Model
         "doctor_schedule_join_hour_id",
         "user_id",
         "amount",
-        "status_pay"
+        "status_pay",
+        "status",
+        "date_attention"
     ];
 
     public function setCreatedAtAttribute($value)
@@ -69,8 +72,19 @@ class Appointment extends Model
         return $this->hasMany(AppointmentPay::class);
     }
 
-    public function scopefilterAdvance($query, $specialitie_id, $name_doctor, $date)
+    public function attention()
     {
+        return $this->hasOne(AppointmentAttention::class);
+    }
+
+
+    public function scopefilterAdvance($query, $specialitie_id, $name_doctor, $date, $user = null)
+    {
+        if ($user) {
+            if (str_contains(Str::upper($user->roles->first()->name), 'DOCTOR')) {
+                $query->where('doctor_id', $user->id);
+            }
+        }
 
         if ($specialitie_id) {
             $query->where("specialitie_id", $specialitie_id);
@@ -119,21 +133,28 @@ class Appointment extends Model
     //     return $query;
     // }
 
-    public function scopefilterAdvancePay($query, $specialitie_id, $search_doctor, $search_patient, $date_start, $date_end)
+    public function scopefilterAdvancePay($query, $specialitie_id, $search_doctor, $search_patient, $date_start, $date_end, $user = null)
     {
+        if ($user) {
+            if (str_contains(Str::upper($user->roles->first()->name), 'DOCTOR')) {
+                $query->where('doctor_id', $user->id);
+            }
+        }
+
         if ($specialitie_id) {
             $query->where("specialitie_id", $specialitie_id);
         }
 
         if ($search_doctor) {
             $query->whereHas("doctor", function ($q) use ($search_doctor) {
-                $q->where(DB::raw("CONCAT(name, ' ', surname)"), "like", "%" . $search_doctor . "%");
+                $q->where(DB::raw("CONCAT(users.name,' ',IFNULL(users.surname,''),' ',IFNULL(users.email,''))"), "like", "%" . $search_doctor . "%");
             });
         }
 
         if ($search_patient) {
             $query->whereHas("patient", function ($q) use ($search_patient) {
                 $q->where(DB::raw("CONCAT(name, ' ', surname)"), "like", "%" . $search_patient . "%");
+                $q->where(DB::raw("CONCAT(patients.name,' ',IFNULL(patients.surname,''),' ',IFNULL(patients.email,''))"), "like", "%" . $search_patient . "%");
             });
         }
 

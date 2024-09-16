@@ -7,14 +7,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class AppointmentPay extends Model
+class AppointmentAttention extends Model
 {
     use HasFactory;
     use SoftDeletes;
     protected $fillable = [
         "appointment_id",
-        "amount",
-        "method_payment",
+        "patient_id",
+        "description",
+        "receta_medica",
     ];
 
     public function setCreatedAtAttribute($value)

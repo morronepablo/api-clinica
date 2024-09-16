@@ -51,21 +51,25 @@ class AuthController extends Controller
     {
         $this->authorize('create', User::class);
 
-        $validator = Validator::make(request()->all(), [
-            'name' => 'required',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|min:8',
+        return response()->json([
+            "message" => 200,
         ]);
 
-        if ($validator->fails()) {
-            return response()->json($validator->errors()->toJson(), 400);
-        }
+        // $validator = Validator::make(request()->all(), [
+        //     'name' => 'required',
+        //     'email' => 'required|email|unique:users',
+        //     'password' => 'required|min:8',
+        // ]);
 
-        $user = new User;
-        $user->name = request()->name;
-        $user->email = request()->email;
-        $user->password = bcrypt(request()->password);
-        $user->save();
+        // if ($validator->fails()) {
+        //     return response()->json($validator->errors()->toJson(), 400);
+        // }
+
+        // $user = new User;
+        // $user->name = request()->name;
+        // $user->email = request()->email;
+        // $user->password = bcrypt(request()->password);
+        // $user->save();
 
         return response()->json($user, 201);
     }
